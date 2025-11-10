@@ -1,12 +1,13 @@
+import enum
 
-class QUERY_TYPES:
+class QUERY_TYPES(enum.Enum):
     LOGIN = 0
     BALANCED_PARENTHESES = 1
     LCM = 2
     CESAR_CIPHER = 3
     QUIT = 4
 
-class ERROR_CODES:
+class ERROR_CODES(enum.Enum):
     NO_ERROR = 0
     INVALID_MSG_FORMAT = 1
     INVALID_INPUT = 2
