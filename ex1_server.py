@@ -1,6 +1,6 @@
 import sys
 from socket import *
-from DYSC_protocol import *
+from dysc_protocol import *
 import errno
 from select import select
 
