@@ -1,6 +1,8 @@
 import sys
 from socket import *
 from scyd_protocol import *
+import errno
+from select import select
 
 QUEUE_SIZE = 5
 
@@ -42,31 +44,130 @@ class server:
         
         return None
 
-
-    
     def run(self):
         # Start server operations here
-        listen_socket = socket(AF_INET, SOCK_STREAM)
-        listen_socket.bind(('', self.server_port))
-        listen_socket.listen(QUEUE_SIZE)
-        print(f"Server listening on port {self.server_port}...")
+        try:
+            listen_socket = socket(AF_INET, SOCK_STREAM)
+            listen_socket.bind(('', self.server_port))
+            listen_socket.listen(QUEUE_SIZE)
+            print(f"Server listening on port {self.server_port}...")
+        except OSError as e:
+            print(f"Error starting server: {e}")
+            sys.exit(1)
+
+        # prepare for select loop
+        rlist = [listen_socket]
+        wlist = []
+        xlist = []
+
+        # socket msg dictionary
+        socket_msg_dict = {}
+        welcome_msg =  SCYD.build_msg(ERROR_CODES.NO_ERROR.value, ["Welcome! Please log in"])
 
         while True:
-            (conn_socket, addr) = listen_socket.accept()
-            #print(f"Accepted connection from {addr}")
-            #conn_socket.send(b"Hello, Client!")
-            
-            input_data = conn_socket.recv(1024)
-            try:
-                input_tuple = SCYD.parse_msg(input_data.decode())
-                print(f"Received from client: {input_tuple}")
-            except ValueError as ve:
-                print(f"Invalid input from client: {ve}")
-            
-            conn_socket.close()
+            # select readable, writable sockets
+            readable, writable, _ = select(rlist, wlist, xlist)
 
+            # first handle incoming messages
+            for sock in readable:
+                # if new connection
+                if sock is listen_socket:
+                    try:
+                        client_socket, _ = listen_socket.accept()
+                        rlist.append(client_socket)
+                        wlist.append(client_socket)
+                        # set welcome message
+                        socket_msg_dict[client_socket] = (ERROR_CODES.NO_ERROR.value, welcome_msg)
+            
+                    except OSError as e:
+                        print(f"Error accepting new connection: {e}")
+                    
+                else:
+                    # existing connection, receive data
+                    try:
+                        input_data = sock.recv(1024)
+                        code, payload = SCYD.parse_msg(input_data.decode())
+
+                        #if yet to login
+                        if socket_msg_dict[sock] != None and socket_msg_dict[sock][0] < 0:
+                            # if not login query, illegal access
+                            if code != QUERY_TYPES.LOGIN.value:
+                                error_msg = SCYD.build_msg(ERROR_CODES.ILLEGAL_QUERY.value, ["Illegal Access, yet to login"])
+                                socket_msg_dict[sock] = (ERROR_CODES.ILLEGAL_QUERY.value, error_msg)
+                                continue # to next readable socket
+                            
+                            # attempt login
+                            socket_msg_dict[sock] = self.attempt_login(payload)
+                        
+                        else:
+                            # if logged in already but sent login query again, illegal query
+                            if code == QUERY_TYPES.LOGIN.value:
+                                error_msg = SCYD.build_msg(ERROR_CODES.ILLEGAL_QUERY.value, ["Already logged in"])
+                                socket_msg_dict[sock] = (ERROR_CODES.ILLEGAL_QUERY.value, error_msg)
+                           
+                            else: # handle services
+                                socket_msg_dict[sock] = self.services(code, payload)
+
+                    # if throwm error during parsing, send invalid format error (later close socket)
+                    except ValueError:
+                        error_msg = SCYD.build_msg(ERROR_CODES.INVALID_MSG_FORMAT.value, ["Invalid Message Format"])
+                        socket_msg_dict[sock] = (ERROR_CODES.INVALID_MSG_FORMAT.value, error_msg)
+
+            # now handle outgoing messages
+            for sock in writable:
+                # check if there's a message to send
+                if socket_msg_dict[sock] != None:
+                    code, msg = socket_msg_dict[sock]
+                    try:
+                        # if we want to ignore this msg - sentinal for not logged in
+                        if code < -1:
+                            continue # already sended failed login message
+
+                        # send message
+                        sock.send(msg)
+
+
+                        # if failed\yet to log in, update so would only send once
+                        if code == -1 or socket_msg_dict[sock][1] == welcome_msg:
+                            socket_msg_dict[sock] = (-2, b"")
+                       
+                        # if message was error, close socket
+                        elif code != ERROR_CODES.NO_ERROR.value:
+                            rlist.remove(sock)
+                            wlist.remove(sock)
+                            del socket_msg_dict[sock]
+                            sock.close()
+                       
+                        else:
+                            # clear message after sending
+                            socket_msg_dict[sock] = None
+
+                    except OSError as e:
+                        print(f"Error occured while sending message to client: {e}")
+                    
         return None
+
+    def attempt_login(self, payload):
+        '''
+        Attempt to login with the given payload [username, password].
+        checks if the username and password match.
+        returns 0 on success, -1 on failure.
+        '''
+        if len(payload) != 2:
+            return (ERROR_CODES.INVALID_INPUT.value, SCYD.build_msg(ERROR_CODES.INVALID_INPUT.value, ["Login requires username and password"]))
+        
+        username, password = payload
+        if self.users_dict.get(username) != password:
+            return (-1, SCYD.build_msg(ERROR_CODES.NO_ERROR.value, ["Failed to login."]))
+        return (ERROR_CODES.NO_ERROR.value, SCYD.build_msg(ERROR_CODES.NO_ERROR.value, [f"Hi {username}, good to see you"]))
+
+    def services(self, code, input_data):
+        '''
+        Handle different services based on the func argument.
+        '''
+        return (ERROR_CODES.NO_ERROR.value, SCYD.build_msg(ERROR_CODES.NO_ERROR.value, ["Not implemented"]))  # To be implemented
     
+
 
 if __name__ == "__main__":
 
