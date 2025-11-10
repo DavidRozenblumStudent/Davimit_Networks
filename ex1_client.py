@@ -1,6 +1,6 @@
 import sys
 from socket import *
-from DYSC_protocol import *
+from dysc_protocol import *
 
 # CONSTS
 HOSTNAME = "127.0.0.1"
