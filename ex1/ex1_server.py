@@ -1,14 +1,16 @@
 import sys
 from socket import *
-from scyd_protocol import *
+from DYSC_protocol import *
 import errno
 from select import select
 
+# CONSTS
 QUEUE_SIZE = 5
+SERVER_PORT = 1377
 
 class server:
 
-    def __init__(self, users_file, server_port=1337):
+    def __init__(self, users_file, server_port=SERVER_PORT):
         '''
         Initialize the server with user dictionary from the given file,
         and set the server port(default 1337).
@@ -62,7 +64,7 @@ class server:
 
         # socket msg dictionary
         socket_msg_dict = {}
-        welcome_msg =  SCYD.build_msg(ERROR_CODES.NO_ERROR.value, ["Welcome! Please log in"])
+        welcome_msg =  DYSC.build_msg(ERROR_CODES.NO_ERROR.value, ["Welcome! Please log in"])
 
         while True:
             # select readable, writable sockets
@@ -86,13 +88,13 @@ class server:
                     # existing connection, receive data
                     try:
                         input_data = sock.recv(1024)
-                        code, payload = SCYD.parse_msg(input_data.decode())
+                        code, payload = DYSC.parse_msg(input_data.decode())
 
                         #if yet to login
                         if socket_msg_dict[sock] != None and socket_msg_dict[sock][0] < 0:
                             # if not login query, illegal access
                             if code != QUERY_TYPES.LOGIN.value:
-                                error_msg = SCYD.build_msg(ERROR_CODES.ILLEGAL_QUERY.value, ["Illegal Access, yet to login"])
+                                error_msg = DYSC.build_msg(ERROR_CODES.ILLEGAL_QUERY.value, ["Illegal Access, yet to login"])
                                 socket_msg_dict[sock] = (ERROR_CODES.ILLEGAL_QUERY.value, error_msg)
                                 continue # to next readable socket
                             
@@ -102,7 +104,7 @@ class server:
                         else:
                             # if logged in already but sent login query again, illegal query
                             if code == QUERY_TYPES.LOGIN.value:
-                                error_msg = SCYD.build_msg(ERROR_CODES.ILLEGAL_QUERY.value, ["Already logged in"])
+                                error_msg = DYSC.build_msg(ERROR_CODES.ILLEGAL_QUERY.value, ["Already logged in"])
                                 socket_msg_dict[sock] = (ERROR_CODES.ILLEGAL_QUERY.value, error_msg)
                            
                             else: # handle services
@@ -110,7 +112,7 @@ class server:
 
                     # if throwm error during parsing, send invalid format error (later close socket)
                     except ValueError:
-                        error_msg = SCYD.build_msg(ERROR_CODES.INVALID_MSG_FORMAT.value, ["Invalid Message Format"])
+                        error_msg = DYSC.build_msg(ERROR_CODES.INVALID_MSG_FORMAT.value, ["Invalid Message Format"])
                         socket_msg_dict[sock] = (ERROR_CODES.INVALID_MSG_FORMAT.value, error_msg)
 
             # now handle outgoing messages
@@ -154,33 +156,36 @@ class server:
         returns 0 on success, -1 on failure.
         '''
         if len(payload) != 2:
-            return (ERROR_CODES.INVALID_INPUT.value, SCYD.build_msg(ERROR_CODES.INVALID_INPUT.value, ["Login requires username and password"]))
+            return (ERROR_CODES.INVALID_INPUT.value, DYSC.build_msg(ERROR_CODES.INVALID_INPUT.value, ["Login requires username and password"]))
         
         username, password = payload
         if self.users_dict.get(username) != password:
-            return (-1, SCYD.build_msg(ERROR_CODES.NO_ERROR.value, ["Failed to login."]))
-        return (ERROR_CODES.NO_ERROR.value, SCYD.build_msg(ERROR_CODES.NO_ERROR.value, [f"Hi {username}, good to see you"]))
+            return (-1, DYSC.build_msg(ERROR_CODES.NO_ERROR.value, ["Failed to login."]))
+        return (ERROR_CODES.NO_ERROR.value, DYSC.build_msg(ERROR_CODES.NO_ERROR.value, [f"Hi {username}, good to see you"]))
 
     def services(self, code, input_data):
         '''
         Handle different services based on the func argument.
         '''
-        return (ERROR_CODES.NO_ERROR.value, SCYD.build_msg(ERROR_CODES.NO_ERROR.value, ["Not implemented"]))  # To be implemented
-    
+        return (ERROR_CODES.NO_ERROR.value, DYSC.build_msg(ERROR_CODES.NO_ERROR.value, ["Not implemented"]))  # TODO
 
 
 if __name__ == "__main__":
 
     # Validate command-line arguments
     if(len(sys.argv) < 2 or len(sys.argv) > 3):
-        print("Usage: python ex1_server.py <users_file_path> [server_port(optional)]")
+        print("Usage: python ex1_server.py users_file_path [server_port]")
         sys.exit(1)
 
-    # Set default port and parse arguments
-    server_port = 1377
+    server_port = SERVER_PORT
+
     user_file = sys.argv[1]
     if len(sys.argv) == 3:
-        server_port = int(sys.argv[2])
+        try:
+            server_port = int(sys.argv[2])
+        except ValueError:
+            print("Invalid port number. Try again.")
+            sys.exit(1)
 
     # Create and run server instance
     server_instance = server(user_file, server_port)
