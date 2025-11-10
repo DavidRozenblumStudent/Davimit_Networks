@@ -1,5 +1,6 @@
 import sys
 from socket import *
+from scyd_protocol import *
 
 class client:
     def __init__(self, hostname, port):
@@ -14,9 +15,7 @@ class client:
         client_socket.connect((self.hostname, self.port))
         print(f"Connected to server at {self.hostname}:{self.port}")
 
-        message = client_socket.recv(1024)
-        print(f"Received from server: {message.decode()}")
-
+        client_socket.send(SCYD.build_msg(QUERY_TYPES.LOGIN, ['user','pass']))
         client_socket.close()
         return None
 
