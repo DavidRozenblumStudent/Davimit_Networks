@@ -56,7 +56,7 @@ class client:
                         msg = DYSC.build_msg(QUERY_TYPES.LOGIN.value, [username, password])
 
                 # if parenthases command, build BALANCED_PARENTHESES message
-                elif len(line) == 2 and line[0] == "parenthases":
+                elif len(line) == 2 and line[0] == "parenthases:":
                     msg = DYSC.build_msg(QUERY_TYPES.BALANCED_PARENTHESES.value, [line[1]])
                 
                 # if lcm command, send LCM message
