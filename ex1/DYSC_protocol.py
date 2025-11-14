@@ -37,5 +37,4 @@ class DYSC:
                 raise ValueError("WRONG FORMAT!")
         except Exception as e:
             raise ValueError(e)
-        return None
 

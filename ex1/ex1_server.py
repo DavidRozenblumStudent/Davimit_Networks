@@ -3,13 +3,15 @@ from socket import *
 from DYSC_protocol import *
 import errno
 from select import select
+import math
 
 # CONSTS
 QUEUE_SIZE = 5
 SERVER_PORT = 1377
+WELCOME_MSG = "Welcome! Please log in."
+FAIL_TO_LOGIN_MSG = "Failed to login."
 
 class server:
-
     def __init__(self, users_file, server_port=SERVER_PORT):
         '''
         Initialize the server with user dictionary from the given file,
@@ -64,7 +66,7 @@ class server:
 
         # socket msg dictionary
         socket_msg_dict = {}
-        welcome_msg =  DYSC.build_msg(ERROR_CODES.NO_ERROR.value, ["Welcome! Please log in"])
+        welcome_msg =  DYSC.build_msg(ERROR_CODES.NO_ERROR.value, [WELCOME_MSG])
 
         while True:
             # select readable, writable sockets
@@ -128,7 +130,6 @@ class server:
                         # send message
                         sock.send(msg)
 
-
                         # if failed\yet to log in, update so would only send once
                         if code == -1 or socket_msg_dict[sock][1] == welcome_msg:
                             socket_msg_dict[sock] = (-2, b"")
@@ -160,18 +161,87 @@ class server:
         
         username, password = payload
         if self.users_dict.get(username) != password:
-            return (-1, DYSC.build_msg(ERROR_CODES.NO_ERROR.value, ["Failed to login."]))
+            return (-1, DYSC.build_msg(ERROR_CODES.NO_ERROR.value, [FAIL_TO_LOGIN_MSG]))
         return (ERROR_CODES.NO_ERROR.value, DYSC.build_msg(ERROR_CODES.NO_ERROR.value, [f"Hi {username}, good to see you"]))
+
+    def service_balanced_parentheses(self, input_data):
+        '''Handle BALANCED_PARENTHESES service.'''
+        if len(input_data) != 1:
+            return (ERROR_CODES.INVALID_INPUT.value,
+                    DYSC.build_msg(ERROR_CODES.INVALID_INPUT.value, ["Balanced parentheses requires 1 string"]))
+        s = str(input_data[0])
+        stack = []
+        for ch in s:
+            if ch == '(':
+                stack.append(ch)
+            elif ch == ')':
+                if not stack:
+                    result = "NO"
+                    break
+                stack.pop()
+        else:
+            result = "YES" if not stack else "NO"
+        return (ERROR_CODES.NO_ERROR.value, DYSC.build_msg(ERROR_CODES.NO_ERROR.value, [result]))
+
+    def service_lcm(self, input_data):
+        '''Handle LCM service.'''
+        try:
+            assert(len(input_data) == 2)
+            a = int(input_data[0])
+            b = int(input_data[1])
+        except Exception:
+            return (ERROR_CODES.INVALID_INPUT.value,
+                    DYSC.build_msg(ERROR_CODES.INVALID_INPUT.value, ["LCM arguments must be 2 integers"]))
+
+        if a == 0 and b == 0:
+            return (ERROR_CODES.INVALID_INPUT.value,
+                    DYSC.build_msg(ERROR_CODES.INVALID_INPUT.value, ["LCM undefined for both operands zero"]))
+        g = math.gcd(a, b)
+        lcm = 0 if g == 0 else abs(a * b) // g
+        return (ERROR_CODES.NO_ERROR.value, DYSC.build_msg(ERROR_CODES.NO_ERROR.value, [str(lcm)]))
+
+    def service_cesar_cipher(self, input_data):
+        '''Handle CESAR_CIPHER service.'''
+        if len(input_data) != 2:
+            return (ERROR_CODES.INVALID_INPUT.value,
+                    DYSC.build_msg(ERROR_CODES.INVALID_INPUT.value, ["Cesar cipher requires shift and text"]))
+        
+        try:
+            shift = int(input_data[0])
+        except Exception:
+            return (ERROR_CODES.INVALID_INPUT.value,
+                    DYSC.build_msg(ERROR_CODES.INVALID_INPUT.value, ["Shift must be an int"]))
+        
+        text = str(input_data[1])
+        sshift = shift % 26
+        out_chars = []
+        for ch in text:
+            if 'a' <= ch <= 'z':
+                out_chars.append(chr((ord(ch) - ord('a') + sshift) % 26 + ord('a')))
+            elif 'A' <= ch <= 'Z':
+                out_chars.append(chr((ord(ch) - ord('A') + sshift) % 26 + ord('A')))
+            else:
+                out_chars.append(ch)
+        ciphered = ''.join(out_chars)
+        return (ERROR_CODES.NO_ERROR.value, DYSC.build_msg(ERROR_CODES.NO_ERROR.value, [ciphered]))
 
     def services(self, code, input_data):
         '''
-        Handle different services based on the func argument.
+        Handle different services based on the code argument.
+        Returns (error_code_int, msg_bytes).
         '''
-        return (ERROR_CODES.NO_ERROR.value, DYSC.build_msg(ERROR_CODES.NO_ERROR.value, ["Not implemented"]))  # TODO
+        if code == QUERY_TYPES.BALANCED_PARENTHESES.value:
+            return self.service_balanced_parentheses(input_data)
+        elif code == QUERY_TYPES.LCM.value:
+            return self.service_lcm(input_data)
+        elif code == QUERY_TYPES.CESAR_CIPHER.value:
+            return self.service_cesar_cipher(input_data)
+        else:
+            return (ERROR_CODES.ILLEGAL_QUERY.value,
+                    DYSC.build_msg(ERROR_CODES.ILLEGAL_QUERY.value, ["Illegal query or unsupported operation"]))
 
 
 if __name__ == "__main__":
-
     # Validate command-line arguments
     if(len(sys.argv) < 2 or len(sys.argv) > 3):
         print("Usage: python ex1_server.py users_file_path [server_port]")

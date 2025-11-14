@@ -6,6 +6,7 @@ from DYSC_protocol import *
 HOSTNAME = "127.0.0.1"
 DEF_PORT = 1377
 RECV_BUFFER_SIZE = 1024
+INVALID_CMD_MSG = "Invalid command."
 
 class client:
     def __init__(self, hostname, port):
@@ -49,25 +50,30 @@ class client:
                     # read password from stdin
                     original_line = input()
                     line = original_line.split()
-                    if line[0] == "Password:":
+                    if len(line) > 0 and line[0] == "Password:":
                         password = original_line[len("Password: "):]
                         
                         # build LOGIN message
                         msg = DYSC.build_msg(QUERY_TYPES.LOGIN.value, [username, password])
+                    else:
+                        print(INVALID_CMD_MSG)
+                        break
 
-                # if parenthases command, build BALANCED_PARENTHESES message
-                elif len(line) == 2 and line[0] == "parenthases:":
+                # if parentheses command, build BALANCED_PARENTHESES message
+                elif len(line) == 2 and line[0] == "parenthesis:":
                     msg = DYSC.build_msg(QUERY_TYPES.BALANCED_PARENTHESES.value, [line[1]])
                 
                 # if lcm command, send LCM message
-                # TODO
-
+                elif len(line) == 3 and line[0] == "lcm:":
+                    msg = DYSC.build_msg(QUERY_TYPES.LCM.value, [line[1], line[2]])
+                
                 # if Cesar command
-                # TODO
+                elif len(line) == 3 and line[0] == "cesar:":
+                    msg = DYSC.build_msg(QUERY_TYPES.CESAR_CIPHER.value, [line[1], line[2]])
 
                 # else, invalid command
                 else:
-                    print("Invalid command.")
+                    print(INVALID_CMD_MSG + "2")
                     break
 
                 # send message to server
@@ -97,7 +103,7 @@ if __name__ == "__main__":
     
     if len(sys.argv) >= 2:
         HOSTNAME = sys.argv[1]
-    elif len(sys.argv) == 3:
+    if len(sys.argv) == 3:
         try:
             port = int(sys.argv[2])
         except ValueError:
