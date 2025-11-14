@@ -10,7 +10,7 @@ INVALID_CMD_MSG = "Invalid command."
 
 class client:
     def __init__(self, hostname, port):
-        print(f"Starting client to connect to {hostname} on port {port}")
+        # print(f"Starting client to connect to {hostname} on port {port}")
         self.hostname = hostname
         self.port = port
     
@@ -68,12 +68,12 @@ class client:
                     msg = DYSC.build_msg(QUERY_TYPES.LCM.value, [line[1], line[2]])
                 
                 # if Cesar command
-                elif len(line) == 3 and line[0] == "cesar:":
-                    msg = DYSC.build_msg(QUERY_TYPES.CESAR_CIPHER.value, [line[1], line[2]])
+                elif len(line) > 1 and line[0] == "caesar:":
+                    msg = DYSC.build_msg(QUERY_TYPES.CESAR_CIPHER.value, [" ".join(line[1:-1]), line[-1]])
 
                 # else, invalid command
                 else:
-                    print(INVALID_CMD_MSG + "2")
+                    print(INVALID_CMD_MSG)
                     break
 
                 # send message to server
@@ -85,8 +85,7 @@ class client:
                 
                 # check for errors
                 if response[0] != ERROR_CODES.NO_ERROR.value:
-                    print(f"ERROR - {response[0]}: {response[1][0]}")
-                    break # breaking because all errors are fatal
+                    print(f"ERROR {response[0]}: {response[1][0]}")
 
                 print(f"{response[1][0]}")
                 
@@ -110,7 +109,7 @@ if __name__ == "__main__":
             print("Invalid port number. Try again.")
             sys.exit(1)
     
-    print(f"Connecting to server at {HOSTNAME} on port {port}")
+    # print(f"Connecting to server at {HOSTNAME} on port {port}")
     
     # create client instance and run
     client_instance = client(HOSTNAME, port)

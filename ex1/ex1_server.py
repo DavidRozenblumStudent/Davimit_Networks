@@ -1,7 +1,6 @@
 import sys
 from socket import *
 from DYSC_protocol import *
-import errno
 from select import select
 import math
 
@@ -17,7 +16,7 @@ class server:
         Initialize the server with user dictionary from the given file,
         and set the server port(default 1337).
         '''
-        print(f"Starting server with user file: {users_file} on port: {server_port}")
+        # print(f"Starting server with user file: {users_file} on port: {server_port}")
         self.server_port = server_port
         self.users_dict = {}
         
@@ -148,8 +147,6 @@ class server:
                     except OSError as e:
                         print(f"Error occured while sending message to client: {e}")
                     
-        return None
-
     def attempt_login(self, payload):
         '''
         Attempt to login with the given payload [username, password].
@@ -176,12 +173,12 @@ class server:
                 stack.append(ch)
             elif ch == ')':
                 if not stack:
-                    result = "NO"
+                    result = "no"
                     break
                 stack.pop()
         else:
-            result = "YES" if not stack else "NO"
-        return (ERROR_CODES.NO_ERROR.value, DYSC.build_msg(ERROR_CODES.NO_ERROR.value, [result]))
+            result = "yes" if not stack else "no"
+        return (ERROR_CODES.NO_ERROR.value, DYSC.build_msg(ERROR_CODES.NO_ERROR.value, [f"the parentheses are balanced: {result}"]))
 
     def service_lcm(self, input_data):
         '''Handle LCM service.'''
@@ -198,21 +195,22 @@ class server:
                     DYSC.build_msg(ERROR_CODES.INVALID_INPUT.value, ["LCM undefined for both operands zero"]))
         g = math.gcd(a, b)
         lcm = 0 if g == 0 else abs(a * b) // g
-        return (ERROR_CODES.NO_ERROR.value, DYSC.build_msg(ERROR_CODES.NO_ERROR.value, [str(lcm)]))
+        return (ERROR_CODES.NO_ERROR.value, DYSC.build_msg(ERROR_CODES.NO_ERROR.value, [f"the lcm is: {lcm}"]))
 
-    def service_cesar_cipher(self, input_data):
-        '''Handle CESAR_CIPHER service.'''
+    def service_caesar_cipher(self, input_data):
+        '''Handle CAESAR_CIPHER service.'''
         if len(input_data) != 2:
             return (ERROR_CODES.INVALID_INPUT.value,
                     DYSC.build_msg(ERROR_CODES.INVALID_INPUT.value, ["Cesar cipher requires shift and text"]))
         
         try:
-            shift = int(input_data[0])
+            shift = int(input_data[1])
         except Exception:
             return (ERROR_CODES.INVALID_INPUT.value,
                     DYSC.build_msg(ERROR_CODES.INVALID_INPUT.value, ["Shift must be an int"]))
         
-        text = str(input_data[1])
+        text = str(input_data[0])
+        print(input_data, text)
         sshift = shift % 26
         out_chars = []
         for ch in text:
@@ -220,10 +218,14 @@ class server:
                 out_chars.append(chr((ord(ch) - ord('a') + sshift) % 26 + ord('a')))
             elif 'A' <= ch <= 'Z':
                 out_chars.append(chr((ord(ch) - ord('A') + sshift) % 26 + ord('A')))
-            else:
+            elif ch == ' ':
                 out_chars.append(ch)
+            else:
+                print(f"Invalid character in caesar cipher input: {ch}")
+                return (ERROR_CODES.INVALID_INPUT.value,
+                        DYSC.build_msg(ERROR_CODES.INVALID_INPUT.value, ["Invalid input"]))
         ciphered = ''.join(out_chars)
-        return (ERROR_CODES.NO_ERROR.value, DYSC.build_msg(ERROR_CODES.NO_ERROR.value, [ciphered]))
+        return (ERROR_CODES.NO_ERROR.value, DYSC.build_msg(ERROR_CODES.NO_ERROR.value, [f"the ciphertext is: {''.join(ciphered)}"]))
 
     def services(self, code, input_data):
         '''
@@ -235,7 +237,7 @@ class server:
         elif code == QUERY_TYPES.LCM.value:
             return self.service_lcm(input_data)
         elif code == QUERY_TYPES.CESAR_CIPHER.value:
-            return self.service_cesar_cipher(input_data)
+            return self.service_caesar_cipher(input_data)
         else:
             return (ERROR_CODES.ILLEGAL_QUERY.value,
                     DYSC.build_msg(ERROR_CODES.ILLEGAL_QUERY.value, ["Illegal query or unsupported operation"]))
